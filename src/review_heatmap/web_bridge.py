@@ -186,6 +186,14 @@ class _CommandHandler:
     def invoke_snanki(self, payload: Any, context: SUPPORTED_CONTEXT_TYPES) -> None:
         parent = self._get_context_parent(context)
         invoke_snanki(parent=parent)
+        
+    @_register_command_handler("activitytype")
+    def handle_activity_type(self, payload: str, context: SUPPORTED_CONTEXT_TYPES) -> None:
+        # Save the selected activity type to the config
+        self._config["synced"]["activity_type"] = payload
+        self._config.save()
+        # Refresh the screen to show the new data
+        self._mw.reset()
 
     # Helpers
 

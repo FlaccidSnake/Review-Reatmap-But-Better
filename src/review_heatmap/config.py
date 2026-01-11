@@ -29,23 +29,18 @@
 #
 # Any modifications to this file must keep this entire header intact.
 
-"""
-Handles add-on configuration
-"""
+# -*- coding: utf-8 -*-
+
+# Modified config.py# Modified config.py
 
 from typing import Dict
-
 from aqt import mw
-
 from .consts import ADDON
 from .libaddon.anki.configmanager import ConfigManager
 
 __all__ = ["heatmap_colors", "heatmap_modes", "config_defaults", "config"]
 
-# NOTE: Order is important for a predictable selection dropdown.
-# NOTE: Preserving the (key, dict) pair even though the dict only contains one
-# key in case we need to provide additional info on each theme in the future.
-
+# Updated color themes with added/introduced variants
 heatmap_colors: Dict[str, Dict[str, str]] = {
     "lime": {"label": "Lime"},
     "olive": {"label": "Olive"},
@@ -71,7 +66,6 @@ heatmap_modes: Dict[str, Dict] = {
     },
 }
 
-
 config_defaults: Dict[str, Dict] = {
     "synced": {
         "colors": "lime",
@@ -82,12 +76,19 @@ config_defaults: Dict[str, Dict] = {
         "limcdel": False,
         "limresched": True,
         "limdecks": [],
+        "activitytype": "reviews",  # Default activity type
         "version": ADDON.VERSION,
     },
     "profile": {
         "display": {"deckbrowser": True, "overview": True, "stats": True},
         "statsvis": True,
         "hotkeys": {},
+        # Color preferences per activity type
+        "colors_per_activity": {
+            "reviews": "lime",
+            "added": "flame",      # Use existing red/orange theme
+            "introduced": "ice",   # Use existing blue theme
+        },
         "version": ADDON.VERSION,
     },
 }

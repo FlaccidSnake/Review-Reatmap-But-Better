@@ -76,5 +76,4 @@ def initialize_addon():
     initialize_views(controller)
     initialize_finder()
 
-
 initialize_addon()

@@ -33,6 +33,8 @@
 Static web components and templates
 """
 
+# Modified web_content.py with activity selector
+
 from .libaddon.platform import MODULE_ADDON, PLATFORM
 
 CSS_DISABLE_HEATMAP = "rh-disable-heatmap"
@@ -58,11 +60,16 @@ var rhNewFinderAPI = false;
 </div>
 """
 
+# Updated HTML_HEATMAP with activity selector
 HTML_HEATMAP: str = f"""
 <div class="heatmap">
     <div class="heatmap-controls">
         <div class="alignleft">
-            <span>&nbsp;</span>
+            <select class="hm-sel" onchange="pycmd('revhm_activitytype:' + this.value);">
+                <option value="reviews">Reviews</option>
+                <option value="introduced">Cards Introduced</option>
+                <option value="added">Cards Added</option>
+            </select>
         </div>
         <div class="aligncenter">
             <div title="Go back\n(Shift-click for first year)" onclick="reviewHeatmap.onHmNavigate(event, this, 'prev');" class="hm-btn">
@@ -90,22 +97,26 @@ HTML_HEATMAP: str = f"""
 <script type="text/javascript">
     window.reviewHeatmap = new ReviewHeatmap({{options}});
     reviewHeatmap.create({{data}});
+    
+    // Set selected option based on activity type
+    const activityType = {{options}}.activityType || 'reviews';
+    document.querySelector('.hm-sel').value = activityType;
 </script>
 """
 
 HTML_STREAK: str = """
 <div class="streak">
     <span class="streak-info">Daily average:</span>
-    <span title="Average reviews on active days"
+    <span title="Average activity on active days"
         class="sstats {class_activity_daily_avg}">{text_activity_daily_avg}</span>
-    <span class="streak-info">Days learned:</span>
-    <span title="Percentage of days with review activity over entire review history"
+    <span class="streak-info">Days active:</span>
+    <span title="Percentage of days with activity over entire history"
         class="sstats {class_pct_days_active}">{text_pct_days_active}%</span>
     <span class="streak-info">Longest streak:</span>
-    <span title="Longest continuous streak of review activity. All types of repetitions included."
+    <span title="Longest continuous streak of activity"
         class="sstats {class_streak_max}">{text_streak_max}</span>
     <span class="streak-info">Current streak:</span>
-    <span title="Current card review activity streak. All types of repetitions included."
+    <span title="Current activity streak"
         class="sstats {class_streak_cur}">{text_streak_cur}</span>
 </div>
 """

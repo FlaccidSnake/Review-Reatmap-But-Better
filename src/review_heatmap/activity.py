@@ -66,6 +66,8 @@ MAX_FORECAST_DAYS = 73000
 
 class ActivityType(Enum):
     reviews = 0
+    added = 1
+    introduced = 2
 
 
 class StatsType(Enum):
@@ -141,17 +143,25 @@ class ActivityReporter:
                 stop=forecast_stop,
                 current_deck_only=current_deck_only,
             )
-
-            if not history:
-                return None
-
-            activity_report = self._get_activity(history=history, forecast=forecast)
+        elif activity_type == ActivityType.added:
+            history = self._cards_added(
+                start=history_start,
+                current_deck_only=current_deck_only,
+            )
+            forecast = []
+        elif activity_type == ActivityType.introduced:
+            history = self._cards_introduced(
+                start=history_start,
+                current_deck_only=current_deck_only,
+            )
+            forecast = []
         else:
             raise NotImplementedError(
                 "activity type {} not implemented".format(activity_type)
             )
 
-        return activity_report
+        # Correctly package the history and forecast into a report
+        return self._get_activity(history, forecast)
 
     def set_collection(self, col: "Collection"):
         # NOTE: Binding the collection is dangerous if we ever persist ActivityReporter
@@ -455,6 +465,95 @@ GROUP BY day ORDER BY day""".format(
             self.__debug_cards_due(cmd, res)
 
         return [i[:-1] for i in res]
+
+    def _cards_added(
+        self,
+        start: Optional[int] = None,
+        current_deck_only: bool = False,
+    ) -> List[Sequence[int]]:
+        """
+        Query for new cards added to the collection.
+        Card IDs in Anki are millisecond timestamps, so we can extract
+        the creation date directly from the ID.
+        """
+        offset = self._offset * 3600
+
+        lims = []
+        if start is not None:
+            # Convert start timestamp to milliseconds for card ID comparison
+            start_ms = start * 1000
+            lims.append("id >= {}".format(start_ms))
+
+        deck_limit = self._did_limit(current_deck_only)
+        if deck_limit:
+            lims.append("did IN {}".format(deck_limit))
+
+        lim = "WHERE " + " AND ".join(lims) if lims else ""
+
+        cmd = """\
+SELECT CAST(STRFTIME('%s', id / 1000 - {}, 'unixepoch',
+                     'localtime', 'start of day') AS int)
+AS day, COUNT()
+FROM cards {}
+GROUP BY day ORDER BY day""".format(
+            offset, lim
+        )
+
+        res = self._db.all(cmd)
+
+        if isDebuggingOn():
+            logger.debug("Cards Added Query:")
+            logger.debug(cmd)
+            logger.debug(res)
+
+        return res
+
+    def _cards_introduced(
+        self,
+        start: Optional[int] = None,
+        current_deck_only: bool = False,
+    ) -> List[Sequence[int]]:
+        """
+        Query for new cards that were first reviewed (introduced/studied).
+        This finds the first review entry for each card in the revlog.
+        """
+        offset = self._offset * 3600
+
+        lims = []
+        if start is not None:
+            lims.append("day >= {}".format(start))
+
+        deck_limit = self._revlog_limit(current_deck_only)
+        if deck_limit:
+            lims.append(deck_limit)
+
+        lim = "WHERE " + " AND ".join(lims) if lims else ""
+
+        # Find first review for each card (type=0 is for learning cards)
+        # We group by cid and take the minimum id (earliest review)
+        cmd = """\
+SELECT CAST(STRFTIME('%s', id / 1000 - {}, 'unixepoch',
+                     'localtime', 'start of day') AS int)
+AS day, COUNT(DISTINCT cid)
+FROM (
+    SELECT cid, MIN(id) as id
+    FROM revlog
+    WHERE type = 0
+    {}
+    GROUP BY cid
+)
+GROUP BY day ORDER BY day""".format(
+            offset, lim
+        )
+
+        res = self._db.all(cmd)
+
+        if isDebuggingOn():
+            logger.debug("Cards Introduced Query:")
+            logger.debug(cmd)
+            logger.debug(res)
+
+        return res
 
     def _cards_done(
         self,

@@ -68,13 +68,25 @@ class HeatmapController:
             raise CollectionError("Anki collection and/or database is not ready")
 
         if not self._renderer:
-            reporter = ActivityReporter(col, self._config)
-            self._renderer = HeatmapRenderer(self._mw, reporter, self._config)
-        else:
-            pass
-            # self._renderer.set_activity_reporter(reporter)
+            # 1. Create the object FIRST
+            self._renderer = HeatmapRenderer()
+            
+            # 2. THEN assign the attributes
+            self._renderer._mw = self._mw
+            self._renderer._config = self._config
+            self._renderer._reporter = ActivityReporter(col, self._config)
 
-        return self._renderer.render(view, limhist, limfcst, current_deck_only)
+        # Read the activity type from config (default to 'reviews' if missing)
+        activity_mode = self._config["synced"].get("activity_type", "reviews")
+        
+        # Convert string to Enum
+        from .activity import ActivityType
+        try:
+            type_enum = ActivityType[activity_mode]
+        except KeyError:
+            type_enum = ActivityType.reviews
+
+        return self._renderer.render(view, limhist, limfcst, current_deck_only, activity_type=type_enum)
 
 
 def initialize_controller(mw: "AnkiQt", config: "ConfigManager") -> HeatmapController:
