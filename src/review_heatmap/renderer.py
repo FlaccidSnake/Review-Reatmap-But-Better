@@ -82,8 +82,6 @@ class _RenderCache(NamedTuple):
     col_mod: int
 
 
-# Modified sections of renderer.py
-
 class HeatmapRenderer:
     def __init__(self):
         self._mw = None
@@ -104,8 +102,6 @@ class HeatmapRenderer:
         "rh-col19",
         "rh-col20",
     )
-
-        # ... existing code ...
 
     def render(
         self,
@@ -181,17 +177,22 @@ class HeatmapRenderer:
 
     def _get_css_classes(self, view: HeatmapView, activity_type: ActivityType) -> List[str]:
         conf = self._config["synced"]
+        profile_conf = self._config["profile"]
         
-        # Override theme based on activity type
-        theme = conf['colors']
-        if activity_type == ActivityType.added:
-            theme = 'ice'     # Blue theme for Added
-        elif activity_type == ActivityType.introduced:
-            theme = 'flame'   # Red/Orange theme for Introduced
-            
+        # Determine color scheme based on activity type
+        if activity_type == ActivityType.reviews:
+            # Reviews use the global/synced setting for backward compatibility
+            color_scheme = conf['colors']
+        else:
+            # Added/Intro use the new profile-specific settings
+            # Default to 'flame' for added, 'ice' for introduced if missing
+            defaults = {"added": "flame", "introduced": "ice"}
+            saved_colors = profile_conf.get("colors_per_activity", {})
+            color_scheme = saved_colors.get(activity_type.name, defaults.get(activity_type.name, "lime"))
+
         classes = [
             f"{CSS_PLATFORM_PREFIX}-{PLATFORM}",
-            f"{CSS_THEME_PREFIX}-{theme}",  # Use our dynamic theme here
+            f"{CSS_THEME_PREFIX}-{color_scheme}",
             f"{CSS_MODE_PREFIX}-{conf['mode']}",
             f"{CSS_VIEW_PREFIX}-{view.name}",
             f"rh-activity-{activity_type.name}",
@@ -215,7 +216,7 @@ class HeatmapRenderer:
             "offset": report.offset,
             "legend": dynamic_legend,
             "whole": not current_deck_only,
-            "activityType": activity_type.name,  # Pass activity type to JS
+            "activityType": activity_type.name,
         }
 
         return HTML_HEATMAP.format(
@@ -230,7 +231,6 @@ class HeatmapRenderer:
         format_dict: Dict[str, str] = {}
         stats_entry: StatsEntry
 
-        # Adjust labels based on activity type
         item_name = self._get_item_name(activity_type)
 
         for name, stats_entry in data.stats._asdict().items():
@@ -256,7 +256,6 @@ class HeatmapRenderer:
         return HTML_STREAK.format(**format_dict)
 
     def _get_item_name(self, activity_type: ActivityType) -> str:
-        """Get appropriate item name based on activity type"""
         if activity_type == ActivityType.added:
             return "card added"
         elif activity_type == ActivityType.introduced:
@@ -277,6 +276,9 @@ class HeatmapRenderer:
         return list(zip(legend, self._css_colors_reviews[1:]))
 
     def _maybe_pluralize(self, count, label):
+        # FIX: Just return the number as a string for percentages.
+        if label == "%":
+            return str(count)
         return f"{count} {label}" if count == 1 else f"{count} {label}s"
 
     def _save_current_perf(self, report):
@@ -284,13 +286,15 @@ class HeatmapRenderer:
 
     @property
     def _stats_formatting(self):
+        # FIX: Map 10%..100% to theme colors rh-col11..rh-col20
+        # instead of using neutral rh-col0
+        percentage_levels = [
+            (int((i + 1) * 10), self._css_colors_reviews[i + 1]) 
+            for i in range(10)
+        ]
+        
         return {
             StatsType.streak: _StatsVisual(levels=None, unit=None),
-            StatsType.percentage: _StatsVisual(levels=[(100, self._css_colors_reviews[0])], unit="%"),
-            StatsType.cards: _StatsVisual(levels=None, unit=None),
-        }
-        return {
-            StatsType.streak: _StatsVisual(levels=None, unit=None),
-            StatsType.percentage: _StatsVisual(levels=[(100, self._css_colors_reviews[0])], unit="%"),
+            StatsType.percentage: _StatsVisual(levels=percentage_levels, unit="%"),
             StatsType.cards: _StatsVisual(levels=None, unit=None),
         }

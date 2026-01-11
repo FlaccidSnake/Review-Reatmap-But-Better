@@ -215,11 +215,13 @@ class ActivityReporter:
 
             total += activity
 
-        days_learned: int = idx + 1
+        # --- FIX: Use len(history) instead of idx + 1 ---
+        days_learned = len(history)
         today = self._today
 
         # Stats: current streak
-        if history[-1][0] in (today, today - 86400):
+        # --- FIX: Add check for 'history' existence ---
+        if history and history[-1][0] in (today, today - 86400):
             # last recorded date today or yesterday?
             streak_cur = streak_last
 
@@ -227,23 +229,19 @@ class ActivityReporter:
         avg_cur = int(round(total / max(days_learned, 1)))
 
         # Stats: percentage of days with activity
-        #
-        # NOTE: days_total is based on first recorded revlog entry, i.e. it is
-        # not the grand total of days since collection creation date / whatever
-        # history limits the user might have set. This value seems more
-        # desirable and motivating than the raw percentage of days learned
-        # in the date inclusion period.
-
-        days_total = (today - first_day) / 86400 + 1
-
-        if days_total == 1:
-            pdays = 100  # review history only extends to yesterday
+        # --- FIX: Handle empty history case explicitly ---
+        if not history:
+            pdays = 0
         else:
-            pdays = int(round((days_learned / days_total) * 100))
+            days_total = (today - first_day) / 86400 + 1
+            if days_total <= 1:
+                pdays = 100
+            else:
+                pdays = int(round((days_learned / days_total) * 100))
 
         # Compose activity data
         activity_dict: Dict[int, int] = dict(history + forecast)  # type: ignore
-        if history[-1][0] == today:  # history takes precedence for today
+        if history and history[-1][0] == today:  # history takes precedence for today
             activity_dict[today] = history[-1][1]
 
         # individual cal-heatmap dates need to be in ms:

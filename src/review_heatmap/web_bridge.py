@@ -60,7 +60,6 @@ class HeatmapBridge:
     _command_splitter: str = "_"
     _payload_splitter: str = ":"
 
-    # TODO: new deck stats
     _supported_contexts: Tuple[Type[DeckBrowser], Type[Overview], Type[DeckStats]] = (
         DeckBrowser,
         Overview,
@@ -76,7 +75,6 @@ class HeatmapBridge:
         from aqt.gui_hooks import webview_did_receive_js_message
 
         webview_did_receive_js_message.append(self.bridge)
-        # TODO: NewDeckStats
         DeckStats._linkHandler = lambda context, url: self.bridge_legacy(context, url)  # type: ignore
 
     def bridge(self, handled: HANDLED_TYPE, message: str, context: Any) -> HANDLED_TYPE:
@@ -103,13 +101,10 @@ class HeatmapBridge:
         payload: Optional[str]
 
         try:
-            # TODO: handle no command
             command, payload = command_and_payload.split(self._payload_splitter, 1)
         except ValueError:
             command = command_and_payload
             payload = None
-
-        # TODO: decode payload JSON
 
         return self._command_handler(command, payload, context)
 
@@ -144,7 +139,6 @@ class _CommandHandler:
     ) -> Any:
         handler = _command_handler_registry.get(command)
 
-        # TODO: handle no handler more expressively
         if not handler:
             return None
 
@@ -173,6 +167,7 @@ class _CommandHandler:
         new_idx = (cur_idx + 1) % len(modes)
         self._config["synced"]["mode"] = modes[new_idx]
         self._config.save()
+        self._mw.reset()
 
     @_register_command_handler("themeswitch")
     def cycle_hm_themes(self, payload: Any, context: SUPPORTED_CONTEXT_TYPES) -> None:
@@ -181,19 +176,22 @@ class _CommandHandler:
         new_idx = (cur_idx + 1) % len(themes)
         self._config["synced"]["colors"] = themes[new_idx]
         self._config.save()
+        self._mw.reset()
+
+    # --- THIS WAS MISSING ---
+    @_register_command_handler("activitytype")
+    def activitytype(self, payload: str, context: SUPPORTED_CONTEXT_TYPES) -> None:
+        # Save the selection to config
+        self._config["synced"]["activity_type"] = payload
+        self._config.save()
+        # Force a screen refresh so the controller reads the new config
+        self._mw.reset()
+    # ------------------------
 
     @_register_command_handler("snanki")
     def invoke_snanki(self, payload: Any, context: SUPPORTED_CONTEXT_TYPES) -> None:
         parent = self._get_context_parent(context)
         invoke_snanki(parent=parent)
-        
-    @_register_command_handler("activitytype")
-    def handle_activity_type(self, payload: str, context: SUPPORTED_CONTEXT_TYPES) -> None:
-        # Save the selected activity type to the config
-        self._config["synced"]["activity_type"] = payload
-        self._config.save()
-        # Refresh the screen to show the new data
-        self._mw.reset()
 
     # Helpers
 

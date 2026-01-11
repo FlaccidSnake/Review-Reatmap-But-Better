@@ -2778,26 +2778,38 @@ class ReviewHeatmap {
   }
 
   create(data) {
-    let calStartDate = applyDateOffset(new Date());
-    let calMinDate = applyDateOffset(new Date(this.options.start));
-    let calMaxDate = applyDateOffset(new Date(this.options.stop));
-    let calTodayDate = applyDateOffset(new Date(this.options.today));
+    // FIX 1: Do NOT multiply by 1000. Python already sends milliseconds.
+    // FIX 2: If start/stop are null (empty history), default to today.
+    let todayMs = this.options.today;
+    let startMs = this.options.start || todayMs; 
+    let stopMs = this.options.stop || todayMs;
+
+    let calTodayDate = applyDateOffset(new Date(todayMs));
+    let calStartDate = new Date(calTodayDate);
     
-    // Get activity type from options
+    let calMinDate = applyDateOffset(new Date(startMs));
+    let calMaxDate = applyDateOffset(new Date(stopMs));
+    
     const activityType = this.options.activityType || 'reviews';
 
+    // In Month mode, pad the start/end to look nice
     if (this.options.domain === "month") {
       let padding = this.options.range / 2;
       let paddingLower = Math.round(padding - 1);
       let paddingUpper = Math.round(padding + 1);
+      
       calStartDate.setMonth(calStartDate.getMonth() - paddingLower);
       calStartDate.setDate(1);
+      
+      // If history is older than the padded view, stretch to fit history
       if (calMinDate.getTime() > calStartDate.getTime()) {
         calStartDate = calMinDate;
       }
+      
       let tempDate = new Date(calTodayDate);
       tempDate.setMonth(tempDate.getMonth() + paddingUpper);
       tempDate.setDate(1);
+      
       if (tempDate.getTime() > calMaxDate.getTime()) {
         calMaxDate = tempDate;
       }
@@ -2845,12 +2857,9 @@ class ReviewHeatmap {
 
   getItemName(activityType) {
     switch(activityType) {
-      case 'added':
-        return ["card added", "cards added"];
-      case 'introduced':
-        return ["card introduced", "cards introduced"];
-      default:
-        return ["card", "cards"];
+      case 'added': return ["card added", "cards added"];
+      case 'introduced': return ["card introduced", "cards introduced"];
+      default: return ["card", "cards"];
     }
   }
 
@@ -2875,29 +2884,22 @@ class ReviewHeatmap {
 
   getEmptyText(activityType, timestamp) {
     const isFuture = Date.now() < timestamp;
-    
     switch(activityType) {
-      case 'added':
-        return "cards added";
-      case 'introduced':
-        return "cards introduced";
-      default:
-        return isFuture ? "cards due" : "reviews";
+      case 'added': return "cards added";
+      case 'introduced': return "cards introduced";
+      default: return isFuture ? "cards due" : "reviews";
     }
   }
 
   getActionText(activityType, value) {
     switch(activityType) {
-      case 'added':
-        return "added";
-      case 'introduced':
-        return "introduced";
-      default:
-        return value < 0 ? "due" : "reviewed";
+      case 'added': return "added";
+      case 'introduced': return "introduced";
+      default: return value < 0 ? "due" : "reviewed";
     }
   }
 
-handleClick(date, nb, activityType, heatmap, calTodayDate) {
+  handleClick(date, nb, activityType, heatmap, calTodayDate) {
     if (nb === null || nb == 0) {
       heatmap.highlight(calTodayDate);
       return;
@@ -2912,24 +2914,15 @@ handleClick(date, nb, activityType, heatmap, calTodayDate) {
     switch(activityType) {
       case 'added':
         let addedDays = diffDays + 1;
-        if (addedDays === 1) {
-            cmd += `added:1`;
-        } else {
-            cmd += `added:${addedDays} -added:${addedDays - 1}`;
-        }
+        if (addedDays === 1) cmd += `added:1`;
+        else cmd += `added:${addedDays} -added:${addedDays - 1}`;
         break;
-        
       case 'introduced':
         let introDays = diffDays + 1;
-        if (introDays === 1) {
-            cmd += `introduced:1`;
-        } else {
-            cmd += `introduced:${introDays} -introduced:${introDays - 1}`;
-        }
+        if (introDays === 1) cmd += `introduced:1`;
+        else cmd += `introduced:${introDays} -introduced:${introDays - 1}`;
         break;
-        
       default:
-        // Original review logic
         if (nb >= 0) {
           if (!window.rhNewFinderAPI) {
             let cutoff1 = date.getTime() + this.options.offset * 3600 * 1000;
@@ -2945,30 +2938,25 @@ handleClick(date, nb, activityType, heatmap, calTodayDate) {
 
     bridgeCommand("revhm_browse:" + cmd);
     heatmap.highlight([calTodayDate, date]);
-  } // <--- THIS BRACE WAS MISSING
-
-  // --- NEW METHODS START HERE (Siblings to handleClick) ---
-
-onHmOpts(event, el) {
-    bridgeCommand("revhm_opts");
   }
 
-  onHmContrib(event, el) {
-    bridgeCommand("revhm_contrib");
-  }
+  onHmOpts(event, el) { bridgeCommand("revhm_opts"); }
+  onHmContrib(event, el) { bridgeCommand("revhm_contrib"); }
 
   onHmNavigate(event, el, dir) {
     if (dir === "prev") {
       if (event.shiftKey) {
-        // Shift+Left: Go to the very first year of history
-        let start = applyDateOffset(new Date(this.options.start));
+        // Go to start date (History beginning)
+        // Use options.start, defaulting to options.today if null
+        let target = this.options.start || this.options.today;
+        let start = applyDateOffset(new Date(target));
         this.heatmap.jumpTo(start, true);
       } else {
         this.heatmap.previous();
       }
     } else {
       if (event.shiftKey) {
-        // Shift+Right: Go back to Today (Latest year)
+        // Go to Today
         this.heatmap.rewind();
       } else {
         this.heatmap.next();
@@ -2977,11 +2965,10 @@ onHmOpts(event, el) {
   }
 
   onHmHome(event, el) {
-    // Circle Button: Reset view to Today
     this.heatmap.rewind();
   }
+}
 
-} 
   function applyDateOffset(date) {
   return new Date(date.getTime() + date.getTimezoneOffset() * 60 * 1000);
 }
