@@ -163,6 +163,11 @@ Custom Heatmap CSS
 	stroke: black;
 }
 
+/* Night mode fix for today's border */
+.night_mode .cal-heatmap-container rect.highlight-now {
+	stroke: white;
+}
+
 .cal-heatmap-container rect.highlight {
 	stroke: #E9002E;
 }
